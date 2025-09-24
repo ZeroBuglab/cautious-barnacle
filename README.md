@@ -3,9 +3,9 @@
 
 ## 🚀 Мои проекты:
 - 🐍 [Игра "Змейка" на Python](https://github.com/username/snake-game)  
-- 🤖 [Telegram-бот](https://github.com/username/telegram-bot)  
+- 🤖 [Telegram-бот](__TGBOT__.py)  
 - 📊 [Парсер данных](https://github.com/username/data-parser)  
 
 ## 📫 Контакты:
 - Email: b86993229@gmail.com  
-- Telegram: @B0TIK
+- Telegram: @B0TlK
