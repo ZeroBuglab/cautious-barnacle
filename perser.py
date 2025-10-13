@@ -9,4 +9,5 @@
   - telebot — альтернативная библиотека для Telegram (используется вместе с aiogram в некоторых функциях)
   - json — для обработки данных в формате JSON (например, API-ответов)
 
- 📌Для установки pip install aiogram apscheduler requests pandas matplotlib mplfinance telebot
+ 📌Для установки pip install aiogram apscheduler requests pandas matplotlib mplfinance telebot, (остальные уже есть в самом питоне)
+
