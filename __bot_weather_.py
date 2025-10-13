@@ -1,164 +1,37 @@
-from aiogram.types import BufferedInputFile
-import io
-import asyncio
-import datetime
+from telebot import TeleBot
 import requests
-import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
-import mplfinance as mpf
-
-from aiogram import Bot, Dispatcher, Router
-from aiogram.types import Message
-from aiogram.filters import Command
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import telebot
+import json
+API='3fe0e2348031d7a1fabcf78487e89811'
 
 
-TOKEN = "YOUR TOKEN"
-SYMBOL_DEFAULT = "BTCUSDT"
-INTERVAL_DEFAULT = "1h"
-CANDLES_DEFAULT = 24
+TOKEN="8234999691:AAFyTz6zqqGPfgdZNMv1vwbzr6UxEMvH1iw"
+bot: TeleBot=telebot.TeleBot(TOKEN)
 
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-router = Router()
-dp.include_router(router)
+@bot.message_handler(commands=['start','main',"Привет"])
+def main(message):
+    bot.send_message(message.chat.id, f'привет, {message.from_user.first_name},{message.from_user.last_name}' )
 
 
-subscribers: set[int] = set()
+@bot.message_handler(commands=['help'])
+def main(message):
+    bot.send_message(message.chat.id,'<b>Help</b> <em><u>contact:@B0TlK</u></em>', parse_mode='html')
 
 
-def fetch_klines_binance(symbol: str, interval: str, limit: int) -> pd.DataFrame:
-    """Забираем свечи с Binance и готовим DataFrame для mplfinance."""
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": interval, "limit": limit}
-    resp = requests.get(url, params=params, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-
-    if not data:
-        raise RuntimeError("Пустой ответ от Binance")
-
-    df = pd.DataFrame(
-        data,
-        columns=[
-            "time", "open", "high", "low", "close",
-            "volume", "close_time", "qav", "num_trades",
-            "taker_base_vol", "taker_quote_vol", "ignore"
-        ],
-    )
-
-    df["time"] = pd.to_datetime(df["time"], unit="ms")
-    df.set_index("time", inplace=True)
+@bot.message_handler(commands=['weather'])
+def weather(message):
+    bot.send_message(message.chat.id, 'Напиши название города ')
+    bot.register_next_step_handler(message, get_weather)
+def get_weather(message):
+    city = message.text.strip().lower()
+    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API}&units=metric')
+    if res.status_code == 200:
+        data = json.loads(res.text)
+        temp = data["main"]["temp"]
+        bot.reply_to(message,f'Сейчас погода: {temp} °C ')
+    else:
+        bot.reply_to(message, 'Город указан не верно')
 
 
-    cols = ["open", "high", "low", "close", "volume"]
-    df[cols] = df[cols].astype(float)
-
-
-    df = df.rename(
-        columns={
-            "open": "Open",
-            "high": "High",
-            "low": "Low",
-            "close": "Close",
-            "volume": "Volume",
-        }
-    )
-
-    return df[["Open", "High", "Low", "Close", "Volume"]]
-
-def render_chart_to_bytes(df: pd.DataFrame, symbol: str) -> bytes:
-    """Рисуем свечной график и возвращаем PNG-байты (без файлов на диске)."""
-    buf = io.BytesIO()
-    mpf.plot(
-        df,
-        type="candle",
-        mav=(7, 14),
-        volume=True,
-        style="charles",
-        savefig=dict(fname=buf, dpi=120, bbox_inches="tight"),
-    )
-    buf.seek(0)
-    return buf.read()
-
-
-async def make_chart_async(symbol: str = SYMBOL_DEFAULT,
-                           interval: str = INTERVAL_DEFAULT,
-                           limit: int = CANDLES_DEFAULT) -> bytes:
-    """Асинхронная обёртка — чтобы не блокировать цикл."""
-    loop = asyncio.get_running_loop()
-    df = await loop.run_in_executor(None, fetch_klines_binance, symbol, interval, limit)
-    png_bytes = await loop.run_in_executor(None, render_chart_to_bytes, df, symbol)
-    return png_bytes
-
-
-@router.message(Command("start"))
-async def cmd_start(message: Message):
-    subscribers.add(message.chat.id)
-    await message.answer(
-        "Привет! Я присылаю графики крипты \n"
-        "Команды:\n"
-        "• /btc — график BTC/USDT (последние 24 свечи 1h)\n"
-        "• /sub — подписаться на авто-рассылку каждый час\n"
-        "• /unsub — отписаться от авто-рассылки\n"
-    )
-
-@router.message(Command("btc"))
-async def cmd_btc(message: Message):
-    try:
-        png = await make_chart_async("BTCUSDT", "1h", 24)
-        photo = BufferedInputFile(png,filename="chart.png")
-        await message.answer_photo(
-            photo=photo,
-            caption=f"📊 BTC/USDT — последние 24 часа (на {datetime.datetime.now():%d.%m %H:%M})"
-        )
-    except Exception as e:
-        await message.answer(f"⚠️ Не удалось построить график: {e}")
-
-@router.message(Command("sub"))
-async def cmd_sub(message: Message):
-    subscribers.add(message.chat.id)
-    await message.answer("✅ Подписка оформлена. Буду присылать график каждый час.")
-
-@router.message(Command("unsub"))
-async def cmd_unsub(message: Message):
-    subscribers.discard(message.chat.id)
-    await message.answer("❌ Подписка отключена. Больше не буду присылать графики по расписанию.")
-
-
-async def broadcast_chart():
-    if not subscribers:
-        return
-    try:
-        png = await make_chart_async("BTCUSDT", "1h", 24)
-    except Exception as e:
-        # Если не смогли получить график — просто пропускаем цикл
-        print(f"[broadcast] ошибка построения графика: {e}")
-        return
-
-    for chat_id in list(subscribers):
-        try:
-            photo = BufferedInputFile(png,filename="chart.png")
-            await bot.send_photo(
-                chat_id=chat_id,
-                photo=photo,
-                caption=f"⏰ Ежечасный график BTC/USDT (на {datetime.datetime.now():%d.%m %H:%M})"
-            )
-        except Exception as e:
-            print(f"[broadcast] не удалось отправить {chat_id}: {e}")
-
-
-async def main():
-    print("🤖 Бот запускается...")
-    scheduler = AsyncIOScheduler()
-    # каждые 60 минут
-    scheduler.add_job(broadcast_chart, "interval", minutes=60)
-    scheduler.start()
-
-    print("✅ Бот запущен. Ожидаю сообщения...")
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+bot.polling(none_stop=True)
