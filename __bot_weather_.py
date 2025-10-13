@@ -5,7 +5,7 @@ import json
 API='3fe0e2348031d7a1fabcf78487e89811'
 
 
-TOKEN="8234999691:AAFyTz6zqqGPfgdZNMv1vwbzr6UxEMvH1iw"
+TOKEN="YOUR TOKEN"
 bot: TeleBot=telebot.TeleBot(TOKEN)
 
 
@@ -35,3 +35,4 @@ def get_weather(message):
 
 
 bot.polling(none_stop=True)
+
