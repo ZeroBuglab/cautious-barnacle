@@ -7,30 +7,23 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import mplfinance as mpf
-
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message
 from aiogram.filters import Command
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-
 TOKEN = "YOUR TOKEN"
 SYMBOL_DEFAULT = "BTCUSDT"
 INTERVAL_DEFAULT = "1h"
 CANDLES_DEFAULT = 24
-
-
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 router = Router()
 dp.include_router(router)
-
-
 subscribers: set[int] = set()
 
 
 def fetch_klines_binance(symbol: str, interval: str, limit: int) -> pd.DataFrame:
-    """Забираем свечи с Binance и готовим DataFrame для mplfinance."""
     url = "https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": interval, "limit": limit}
     resp = requests.get(url, params=params, timeout=15)
@@ -70,7 +63,7 @@ def fetch_klines_binance(symbol: str, interval: str, limit: int) -> pd.DataFrame
     return df[["Open", "High", "Low", "Close", "Volume"]]
 
 def render_chart_to_bytes(df: pd.DataFrame, symbol: str) -> bytes:
-    """Рисуем свечной график и возвращаем PNG-байты (без файлов на диске)."""
+
     buf = io.BytesIO()
     mpf.plot(
         df,
@@ -87,7 +80,7 @@ def render_chart_to_bytes(df: pd.DataFrame, symbol: str) -> bytes:
 async def make_chart_async(symbol: str = SYMBOL_DEFAULT,
                            interval: str = INTERVAL_DEFAULT,
                            limit: int = CANDLES_DEFAULT) -> bytes:
-    """Асинхронная обёртка — чтобы не блокировать цикл."""
+
     loop = asyncio.get_running_loop()
     df = await loop.run_in_executor(None, fetch_klines_binance, symbol, interval, limit)
     png_bytes = await loop.run_in_executor(None, render_chart_to_bytes, df, symbol)
@@ -134,7 +127,6 @@ async def broadcast_chart():
     try:
         png = await make_chart_async("BTCUSDT", "1h", 24)
     except Exception as e:
-        # Если не смогли получить график — просто пропускаем цикл
         print(f"[broadcast] ошибка построения графика: {e}")
         return
 
@@ -153,7 +145,6 @@ async def broadcast_chart():
 async def main():
     print("🤖 Бот запускается...")
     scheduler = AsyncIOScheduler()
-    # каждые 60 минут
     scheduler.add_job(broadcast_chart, "interval", minutes=60)
     scheduler.start()
 
@@ -162,3 +153,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
