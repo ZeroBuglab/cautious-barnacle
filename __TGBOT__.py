@@ -14,7 +14,7 @@ from aiogram.filters import Command
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 
-TOKEN = "8234999691:AAFyTz6zqqGPfgdZNMv1vwbzr6UxEMvH1iw"
+TOKEN = "YOUR TOKEN"
 SYMBOL_DEFAULT = "BTCUSDT"
 INTERVAL_DEFAULT = "1h"
 CANDLES_DEFAULT = 24
